@@ -1,0 +1,21 @@
+Amino_Acid,3_Letter,1_Letter,Side_chain_class,Side_chain_polarity,Hydropathy_Index,MW,Occurrence_in _proteins
+Alanine,Ala,A,aliphatic,nonpolar,1.8,89.094,8.76
+Arginine,Arg,R,basic,basic polar,−4.5,174.203,5.78
+Asparagine,Asn,N,amide,polar,−3.5,132.119,3.93
+Aspartic acid,Asp,D,acid,acidic polar,−3.5,133.104,5.49
+Cysteine,Cys,C,sulfur-containing,nonpolar,2.5,121.154,1.38
+Glutamic acid,Glu,E,acid,acidic polar,−3.5,147.131,6.32
+Glutamine,Gln,Q,amide,polar,−3.5,146.146,3.9
+Glycine,Gly,G,aliphatic,nonpolar,−0.4,75.067,7.03
+Histidine,His,H,basic aromatic,basic polar,−3.2,155.156,2.26
+Isoleucine,Ile,I,aliphatic,nonpolar,4.5,131.175,5.49
+Leucine,Leu,L,aliphatic,nonpolar,3.8,131.175,9.68
+Lysine,Lys,K,basic,basic polar,−3.9,146.189,5.19
+Methionine,Met,M,sulfur-containing,nonpolar,1.9,149.208,2.32
+Phenylalanine,Phe,F,aromatic,nonpolar,2.8,165.192,3.87
+Proline,Pro,P,cyclic,nonpolar,−1.6,115.132,5.02
+Serine,Ser,S,hydroxyl-containing,polar,−0.8,105.093,7.14
+Threonine,Thr,T,hydroxyl-containing,polar,−0.7,119.119,5.53
+Tryptophan,Trp,W,aromatic,nonpolar,−0.9,204.228,1.25
+Tyrosine,Tyr,Y,aromatic,polar,−1.3,181.191,2.91
+Valine,Val,V,aliphatic,nonpolar,4.2,117.148,6.73
