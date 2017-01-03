@@ -9,7 +9,7 @@ def make_aa_list():
     ''' Returns a list of amino acid codes'''
 
     return ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I',
-            'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'W']
+            'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 
 def make_aa_pairs_list():
     ''' Returns a list of all posible pairs of amino acids'''
@@ -52,7 +52,7 @@ def encode_aa_pair_counts(pep):
     pair_idx_dict = make_idx_dict(make_aa_pairs_list())
     counts = [0] * len(pair_idx_dict)
     for i in range(len(pep)-1):
-        counts[pair_idx_dict[pep[i, i+2]]] += 1
+        counts[pair_idx_dict[pep[i:i+2]]] += 1
     return counts
 
 def encode_aa_binary(pep):
