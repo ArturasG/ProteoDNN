@@ -2,7 +2,7 @@
 # Exploration of the PTM dataset
 
 # Starting with the oxidation
-setwd('~/Projects/ProteoDNN/PTMdrag')
+setwd('~/Projects/ProteoDNN/ProteoDNN/PTMdrag')
 
 dataRaw = read.table('data/OxidationAll.txt', header=T, sep=',', stringsAsFactors = F)
 dataRaw = dataRaw[,1:20]
@@ -18,11 +18,6 @@ pepLen = function(sqn){
 dataPep$pepLen = sapply(dataPep$Peptide, pepLen)
 dataPep$RetDcuts = cut(dataPep$pepLen, breaks = c(5,11,15,20,60))
 
-ggplot(data=dataPep, aes(x=Retention..Delta.))+
-  geom_histogram(bins=100, fill='steelblue')+
-  facet_grid(.~RetDcuts)+
-  theme_bw()
-  
 ggplot(data=dataPep, aes(x=Retention..Delta., y=X.L.m.z))+
   geom_density_2d()+
   theme_bw()
@@ -78,11 +73,33 @@ calcPepProps = function(seq){
   )
 }
 
-AACompNames = c('Tiny', 'Small', 'Aliphatic', 'Aromatic', 'NonPolar', 'Polar', 'Charged', 'Basic', 'Acidic')
-propNames = c('Length',AACompNames, 'Mol_weight', 'Charge', 'pI', 'AliphaticI', 'InstabilityI', 'BomanI', 'Hydrophobicity', 'Hidrophob_moment')
+calcPPss = function(seqs){
+  AACompNames = c('Tiny', 'Small', 'Aliphatic', 'Aromatic', 'NonPolar', 'Polar', 'Charged', 'Basic', 'Acidic')
+  propNames = c('Length',AACompNames, 'Mol_weight', 'Charge', 'pI', 'AliphaticI', 'InstabilityI', 'BomanI', 'Hydrophobicity', 'Hidrophob_moment')
+  
+  out = matrix(0, length(seqs), 18)
+  Np = floor(length(seqs)/100)
+  for( i in 1:length(seqs)) {
+    out[i,] = calcPepProps(seqs[i])
+    if(i %% Np == 0) cat(sprintf('%d%%..', i/Np))
+    }
+  colnames(out) = propNames
+  out
+}
 
-pepProps = do.call('rbind', lapply(dataPep$Peptide, calcPepProps))
+pt_s1 = proc.time()
+pepProps = do.call('rbind', lapply(dataPep$Peptide[1:5000], calcPepProps))
 colnames(pepProps) = propNames
+pt_e1 = -pt_s1 + proc.time()
+pt_e1
+
+pt_s2 = proc.time()
+pepProps = calcPPss(dataPep$Peptide)
+pt_e2 = -pt_s2 + proc.time()
+pt_e2
+
+
+save(list=c('pepProps','dataPep'), file='~/Projects/ProteoDNN/pepProps.RData')
 
 #trying a random forest
 library(randomForest)
@@ -96,11 +113,117 @@ trY = dataPep$Retention..Delta.[intrain]
 teX = pepProps[-intrain,]
 teY = dataPep$Retention..Delta.[-intrain]
 
-RFmod = randomForest(trX, trY)
+RFmod = randomForest(trX, trY, ntree = 50)
 preds = predict(RFmod, newdata = unname(teX))
 
 save(list=c('pepProps','RFmod','preds'), file = '~/Projects/ProteoDNN/ProteoDNN/PTMdrag/RFmodel.RData')
-MSE = mean((preds-teY)^2)
+MRSE = mean((preds-teY)^2)
+MSE = mean((teY-mean(teY))^2)
+
+MRSE_ = mean((preds[teY >0 & teY <20]-teY_)^2)
+MSE_ = mean((teY_-mean(teY_))^2)
+
+Errors = cbind(abs(teY-mean(teY)),abs(preds-teY))
+Errors = cbind(teY,preds,Errors)
+colnames(Errors) = c('teY','preds','AbsE','AbsRE')
+ErrorsDF = as.data.frame(Errors)
+ErrorsDF$charge = as.factor(round(pepProps[-intrain,12]))
+
+ggplot(data=ErrorsDF, aes(x=AbsE, y=AbsRE, col=charge))+
+  geom_point()+
+  facet_grid(.~charge)+
+  theme_bw()
+
+tempErr = data.frame(Errors = c(Errors[,3],Errors[,4]),
+                     ErrInt = c(as.character(cut(Errors[,3],breaks=c(0,0.5,1,2,5,10,100))), as.character(cut(Errors[,4],breaks=c(0,0.5,1,2,5,10,100)))),
+                     ErrType = c(rep('AbsE',nrow(Errors)),rep('AbsRE',nrow(Errors))))
+
+ggplot(data = tempErr, aes(x=factor(ErrInt, ordered=T, levels = c('(0,0.5]','(0.5,1]','(1,2]','(2,5]','(5,10]','(10,100]')) ))+
+  geom_bar(stat='count')+
+  facet_grid(.~ErrType)+
+  theme_bw()+
+  xlab('Retention delta errors')
+
+plot(pepProps[-intrain,1], Errors[,4])
+
+# --------- pred the retention time as well
+
+trYRT = dataPep$X.L.Retention.Time..min.[intrain]
+teYRT = dataPep$X.L.Retention.Time..min.[-intrain]
+
+RFmodRT = randomForest(trX, trYRT, ntree = 50)
+predsRT = predict(RFmodRT, newdata = unname(teX))
+
+MRSE_RT = mean((predsRT-teYRT)^2)
+MSE_RT = mean((teYRT-mean(teYRT))^2)
+
+leftHump = which((teYRT-predsRT) < (-10))
+errHumps = rep(0,length(predsRT))
+errHumps[leftHump] = 1
+
+do_PCA_Plot(teX, as.factor(errHumps))
+
+errD = teYRT - predsRT
+errDDF = data.frame(errDelta = errD, pepLen = teX[,'Length'], pepLenGrp = cut(teX[,'Length'],breaks = c(0,7,15,25,35,45,100))) 
+ggplot(errDDF, aes(x=errDelta, group=as.factor(pepLenGrp))) + geom_histogram(bins = 100) + theme_bw()
+ggplot(errDDF, aes(x=errDelta, group=as.factor(pepLenGrp))) + geom_histogram(bins = 100) + facet_grid(.~pepLenGrp)+ theme_bw()
+
+corsMain = apply(teX[-leftHump,],2,function(x) cor(x,teYRT[-leftHump]))
+corsHump = apply(teX[leftHump,],2,function(x) cor(x,teYRT[leftHump]))
+cors = data.frame(vars = rep(names(corsMain),each=1), cors = c(corsMain, corsHump), split = rep(c('main','hump'),each=18))
+
+ggplot(cors, aes(x=vars, y=cors, fill=as.factor(split)))+
+  geom_bar(stat='identity', position='dodge', col='black')+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+# looking at the sequences in hump
+seqH = dataPep[-intrain,1][leftHump]
+seqH_ = dataPep[-intrain,1][-leftHump]
+
+calcAAfreq = function(seq){
+  AAs = c('A','R','N','D','C','E','Q','G','H','I','L','K','M','F','P','S','T','W','Y','V')
+  store = rep(0,20)
+  seq = strsplit(toupper(seq), '')[[1]]
+  for(i in seq) {
+    pos = which(AAs == i)  
+    store[pos] = store[pos] + 1
+  }
+  #store/sum(store)
+  store[store!=0] = 1
+  store
+}
+
+freqs_ = do.call('rbind',lapply(dataPep[-intrain,1], calcAAfreq))
+plot2GroupsBars(colMeans(freqs_[errHumps==0,]),colMeans(freqs_[errHumps==1,]), AAs, c('Main','Hump'))
+
+teXScaled = scale(teX)
+plot2GroupsBars(colMeans(teXScaled[errHumps==0,]),colMeans(teXScaled[errHumps==1,]), colnames(teX), c('Main','Hump'))
+
+# ------------------------------------------
+
+plot2GroupsBars = function(x, y, vars, labels=c('grp1','grp2'), flipXlabs = F){
+  dat = data.frame(obs = c(x,y), labs = c(vars, vars), grp = c(rep(labels[1], length(x)),rep(labels[2], length(y))))
+  p = ggplot(dat, aes(y=obs, x=as.factor(labs), fill=as.factor(grp)))+
+        geom_bar(stat='identity', position='dodge', col='black')+
+        theme_bw()
+  if(flipXlabs) p = p + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+  p
+}
+
+# --------------------Lets look at the largest errors -------------------- 
+
+largeErrors = which(Errors[,'AbsRE']>=5)
+medErrors = which(Errors[,'AbsRE']>1 & Errors[,'AbsRE']<5)
+
+
+
+
+
+
+
+
+
 
 # finding closest peptides in properties (looking at outliers)
 
@@ -113,9 +236,5 @@ findClosestN = function(x, Y, n, retIdx = T){
   if(retIdx) return(closest)
   else return(Y[closest,])
 }
-
-
-pRFmod = parallelRandomForest::randomForest(trX, trY)
-preds = predict(RFmod, newdata = unname(teX))
 
 
